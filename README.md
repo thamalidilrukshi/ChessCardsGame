@@ -33,6 +33,6 @@ FlashChain Games demonstrates the power of **Linera's Microchain Architecture** 
 3.  Start Backend (Optional): `npm run dev`
 
 ## 🏆 Hackathon Submission
--   **Wave**: 1
+-   **Wave**: 2
 -   **Focus**: Real-time interactions on microchains.
 -   **Status**: MVP Operational (Simulated Chain Layer).

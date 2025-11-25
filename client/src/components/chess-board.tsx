@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
+import { Link } from 'wouter';
+import { ArrowLeft, Loader2, User, Copy } from 'lucide-react';
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { gameService, GameState } from '@/lib/game';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, User, Copy } from 'lucide-react';
 
 interface GameBoardProps {
   gameId: string;
@@ -76,7 +78,21 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
   }, [game, chess, gameId, isSpectator, toast]);
 
   if (isLoading) return <div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (!game) return <div className="text-center text-muted-foreground">Game not found</div>;
+  
+  if (!game) return (
+    <div className="flex flex-col items-center justify-center h-96 space-y-4">
+      <div className="text-center text-muted-foreground text-xl font-display">Game not found</div>
+      <p className="text-sm text-muted-foreground max-w-md text-center">
+        This game ID doesn't exist or might have been cleared from local storage. 
+        Try creating a new game.
+      </p>
+      <Link href="/">
+        <Button variant="outline" className="gap-2">
+          <ArrowLeft className="h-4 w-4" /> Back to Home
+        </Button>
+      </Link>
+    </div>
+  );
 
   const playerWhite = game.players.find(p => p.color === 'w');
   const playerBlack = game.players.find(p => p.color === 'b');

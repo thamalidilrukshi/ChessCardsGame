@@ -21,19 +21,7 @@ export interface GameState {
 }
 
 // Mock Data Store
-const MOCK_GAMES: Record<string, GameState> = {
-  'game-1': {
-    gameId: 'game-1',
-    players: [
-      { wallet: '0x123...abc', color: 'w', seatId: 0, name: 'Alice' },
-      { wallet: '0x456...def', color: 'b', seatId: 1, name: 'Bob' },
-    ],
-    turn: 'w',
-    boardState: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-    moveHistory: [],
-    status: 'active',
-    lastMoveAt: Date.now(),
-  },
+let MOCK_GAMES: Record<string, GameState> = {
   'game-demo': {
     gameId: 'game-demo',
     players: [
@@ -47,6 +35,24 @@ const MOCK_GAMES: Record<string, GameState> = {
   }
 };
 
+// Load from LocalStorage if available
+try {
+  const stored = localStorage.getItem('flashchain_games');
+  if (stored) {
+    MOCK_GAMES = { ...MOCK_GAMES, ...JSON.parse(stored) };
+  }
+} catch (e) {
+  console.error("Failed to load games from storage", e);
+}
+
+const saveGames = () => {
+  try {
+    localStorage.setItem('flashchain_games', JSON.stringify(MOCK_GAMES));
+  } catch (e) {
+    console.error("Failed to save games", e);
+  }
+};
+
 // Simulation of Linera Microchain interactions
 export const gameService = {
   // Mock Wallet Connection
@@ -54,9 +60,14 @@ export const gameService = {
     return new Promise((resolve) => {
       setTimeout(() => {
         const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+        localStorage.setItem('flashchain_wallet', mockAddress);
         resolve(mockAddress);
       }, 500);
     });
+  },
+
+  getWallet: (): string | null => {
+    return localStorage.getItem('flashchain_wallet');
   },
 
   // Create a new game (mock transaction)
@@ -71,6 +82,7 @@ export const gameService = {
       status: 'waiting',
       lastMoveAt: Date.now(),
     };
+    saveGames();
     return new Promise((resolve) => setTimeout(() => resolve(id), 800)); // Simulate network lag
   },
 
@@ -79,8 +91,12 @@ export const gameService = {
     const game = MOCK_GAMES[gameId];
     if (!game || game.status !== 'waiting') return false;
     
+    // Avoid duplicate join
+    if (game.players.some(p => p.wallet === wallet)) return true;
+
     game.players.push({ wallet, color: 'b', seatId: 1, name: 'Opponent' });
     game.status = 'active';
+    saveGames();
     return new Promise((resolve) => setTimeout(() => resolve(true), 500));
   },
 
@@ -110,7 +126,8 @@ export const gameService = {
         game.status = 'finished';
         game.result = chess.isDraw() ? 'draw' : 'win'; // Simplified
       }
-
+      
+      saveGames();
       return new Promise((resolve) => setTimeout(() => resolve(true), 300)); // Fast microchain update
     } catch (e) {
       return false;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { Link } from 'wouter';
-import { ArrowLeft, Loader2, User, Copy } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Copy, Play, Pause, RotateCcw, Flag } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
     if (!game || isSpectator) return false;
+    // Allow moves if game is active
     if (game.status !== 'active') return false;
 
     // Optimistic update
@@ -77,6 +78,16 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
     }
   }, [game, chess, gameId, isSpectator, toast]);
 
+  // Game Control Actions (Simulated)
+  const handleResign = () => {
+    toast({ title: "Resigned", description: "You have resigned the game." });
+    // In a real app, this would send a resign transaction
+  };
+
+  const handlePause = () => {
+     toast({ title: "Paused", description: "Game paused (Simulated)." });
+  };
+
   if (isLoading) return <div className="flex justify-center items-center h-96"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   
   if (!game) return (
@@ -96,6 +107,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
 
   const playerWhite = game.players.find(p => p.color === 'w');
   const playerBlack = game.players.find(p => p.color === 'b');
+  const isMyTurn = game.turn === 'w'; // Assuming user is always white for MVP
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 w-full max-w-6xl mx-auto">
@@ -119,6 +131,15 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
               </span>
             </div>
           </div>
+          
+          <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-2 gap-2">
+             <Button variant="outline" className="w-full border-red-500/30 hover:bg-red-500/10 text-red-400" onClick={handleResign}>
+               <Flag className="mr-2 h-4 w-4" /> Resign
+             </Button>
+             <Button variant="outline" className="w-full border-yellow-500/30 hover:bg-yellow-500/10 text-yellow-400" onClick={handlePause}>
+               <Pause className="mr-2 h-4 w-4" /> Pause
+             </Button>
+          </div>
         </Card>
 
         <Card className="p-6 flex-1 glass-panel border-primary/20 min-h-[300px]">
@@ -141,19 +162,38 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
         {/* Opponent Card */}
         <PlayerCard player={playerBlack} isCurrentTurn={game.turn === 'b'} />
 
-        <div className="w-full max-w-[600px] aspect-square relative neon-glow rounded-lg overflow-hidden border-2 border-primary/30">
+        <div className="w-full max-w-[600px] aspect-square relative neon-glow rounded-lg overflow-hidden border-2 border-primary/30 bg-gray-900/50">
+           {/* Explicitly enable drag and drop */}
           <Chessboard 
             id="BasicBoard"
             position={chess.fen()} 
             onPieceDrop={onDrop}
-            customDarkSquareStyle={{ backgroundColor: '#1e293b' }} // slate-800
-            customLightSquareStyle={{ backgroundColor: '#475569' }} // slate-600
+            arePiecesDraggable={!isSpectator && game.status === 'active'}
+            customDarkSquareStyle={{ backgroundColor: '#1e293b' }} 
+            customLightSquareStyle={{ backgroundColor: '#475569' }}
             boardOrientation="white"
+            animationDuration={200}
           />
+          
+          {/* Overlay for Game Over / Pause */}
+          {game.status !== 'active' && (
+             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10">
+                <div className="text-2xl font-display font-bold text-white">
+                   {game.status === 'finished' ? 'GAME OVER' : 'WAITING'}
+                </div>
+             </div>
+          )}
         </div>
 
         {/* Player Card */}
         <PlayerCard player={playerWhite} isCurrentTurn={game.turn === 'w'} />
+        
+        {/* Mobile Controls (Visible only on small screens) */}
+        <div className="lg:hidden w-full grid grid-cols-3 gap-2">
+             <Button variant="secondary" onClick={handlePause}><Pause className="h-4 w-4 mr-2"/> Pause</Button>
+             <Button variant="destructive" onClick={handleResign}><Flag className="h-4 w-4 mr-2"/> Resign</Button>
+             <Button variant="outline"><RotateCcw className="h-4 w-4 mr-2"/> Reset</Button>
+        </div>
       </div>
 
     </div>

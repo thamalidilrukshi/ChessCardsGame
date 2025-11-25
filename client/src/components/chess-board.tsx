@@ -58,6 +58,10 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
     // Allow moves if game is active
     if (game.status !== 'active') return false;
 
+    // Prevent moving opponent's pieces (redundant check if isDraggablePiece is set, but safe)
+    const piece = chess.get(sourceSquare as any); // Cast to any for chess.js types compatibility
+    if (piece && piece.color !== 'w') return false; // User is White
+
     // Optimistic update
     const move = {
       from: sourceSquare,
@@ -87,9 +91,11 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
 
       return true;
     } catch (error) {
+      console.error("Move error:", error);
       return false;
     }
   }, [game, chess, gameId, isSpectator, toast]);
+
 
   // Game Control Actions (Simulated)
   const handleResign = () => {
@@ -184,6 +190,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
             position={chess.fen()} 
             onPieceDrop={onDrop}
             arePiecesDraggable={!isSpectator && game.status === 'active'}
+            isDraggablePiece={({ piece }) => piece.startsWith('w')} // ONLY WHITE PIECES DRAGGABLE
             // Enable click-to-move behavior if drag fails
             onSquareClick={(square) => {
                // Basic visual feedback for click could be added here, 
@@ -195,7 +202,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
             boardOrientation="white"
             animationDuration={200}
             // Ensure pieces are above any potential overlay issues
-            customPieceStyle={{ zIndex: 50 }}
+            customPieceStyle={{ zIndex: 50, cursor: 'grab' }}
           />
           
           {/* Overlay for Game Over / Pause */}

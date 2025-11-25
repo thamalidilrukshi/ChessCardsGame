@@ -2,3 +2,6 @@
   base    = "/"
   publish = "client/dist"
   command = "cd client && npm install && npm run build"
+
+[dev]
+  framework = "vite"

@@ -1,0 +1,349 @@
+Nice choice — a Real-Time On-chain Chess / Cards Game is a perfect fit for Linera’s microchains. Below is a complete, hands-to-step plan you can use to build, demo, and submit the project. I’m giving you a Product Requirement Doc (PRD), concrete tech stack, architecture, data models, smart-contract design, frontend layout, AI opponent integration, dev tasks, testing & deployment checklist, plus ready-to-use prompts for the AI agent and commit/changelog templates. Use this as your one-stop blueprint and implementation checklist.
+
+PRD — Real-Time On-chain Game (Chess / Cards)
+
+Name (example): FlashChain Games
+Short description: Real-time on-chain Chess and Cards powered by Linera microchains — instant finality, play vs user or AI, no lag, fully on-chain state updates.
+Core features
+
+Real-time state updates on Linera microchains (per-game microchain)
+
+Multiplayer: challenge other wallets and spectate games
+
+Single-player: play vs AI agent (on-chain interactions + off-chain ML when needed)
+
+Turn enforcement, move validation, timeouts, rematch
+
+Leaderboard, match history, replay viewer
+Non-goals (MVP): complex matchmaking, in-game purchases, federated servers
+
+High-level architecture
+
+Linera Microchain per Game Instance — each game (match) gets a microchain that is the canonical state owner.
+
+Pros: isolation, predictable performance, instant updates.
+
+Cons: more microchains created (ok for testnet buildathon).
+
+Frontend (React) — handles UI, local validation, optimistic UI, connects to Linera Web Client for signing/sending actions. Use chessboard.js / chess.js for chess rules and move generation.
+
+Smart Contract (Rust, Linera contract) — owner = game microchain; stores canonical GameState, enforces moves, turn order, timeouts, scoring, and emits events.
+
+AI Agent (off-chain service agent using MCP/GraphQL) — monitors game microchains and submits moves for AI players. Could be a lightweight minimax (chess) or rule-based card AI.
+
+Orchestration / Backend (optional) — for demo only: a small server that helps create game microchains and offers matchmaking UI. Not required if you let players challenge via wallet links.
+
+Storage & Replay — store game events on IPFS or GitHub for replay and replay viewer.
+
+Tech Stack (recommended)
+
+Linera SDK & Web Client (use Linera Web client library)
+
+Smart contracts: Rust (Linera contracts)
+
+Frontend: React + TypeScript
+
+chess.js for chess rules (client)
+
+react-chessboard or chessboardjsx
+
+Wallets: CheCko / Croissant / Linera signer
+
+AI agent: Node.js (TypeScript) using lightweight engine or calls to LLM (optional)
+
+Hosting: Vercel for frontend, Railway/Render for AI agent (if needed)
+
+GitHub for repo + README
+
+Dockerized template for local demo if needed per rules
+
+Data models (on-chain)
+GameState {
+  game_id: GameId,
+  players: [Player { wallet: Address, color: White|Black | seatId }],
+  turn: PlayerIndex,
+  board_state: Bytes,          // serialized chess board (FEN) or card layout
+  move_history: Vec<Move>,     // for replay, each Move signed
+  status: enum { Waiting, Active, Finished },
+  result: Option<Result>,      // win/loss/draw
+  last_move_at: Timestamp,
+  clock: Option<PlayerClocks>, // for blitz games
+  metadata: Map<String,String> // optional: title, stakes
+}
+Move {
+  from: Square, to: Square, promotion: Option<Piece>, // for chess
+  timestamp: Timestamp,
+  signature: Signature, // player's signature if you want extra verification
+  meta: Option<...>
+}
+
+Smart contract responsibilities
+
+Create game (constructor / init) — set players or accept challengers
+
+Validate incoming move: check turn, legality (optionally rely on client validation + verify server-side fundamental rules), update board_state and move_history
+
+Enforce timeouts: if last_move_at + timeout < now allow opponent to claim victory
+
+Emit events / logs on move, game end, rematch request
+
+Provide view endpoints (GraphQL/MCP) for frontend to listen for state updates
+
+Move validation strategy
+
+Client: use chess.js for validation & UIs. Prevent invalid moves locally (optimistic UX).
+
+Contract: do a minimal rule check on-chain: turn check, piece existence, destination not same player's piece, simple capture rules. (Implementing full chess engine in contract is heavy; instead store canonical FEN and basic checks — the judges mainly care about real-time behavior and microchain usage.)
+
+For rigorous legality, you can:
+
+Embed a compact move validation library in Rust in the contract (if comfortable), or
+
+Use signed move + off-chain arbiter that verifies and then calls an on-chain apply_move that only accepts arbiter-signed moves (increases complexity).
+
+Sequence flow (multiplayer)
+
+Player A clicks move in UI → UI validates locally via chess.js.
+
+UI prepares Move payload (JSON) and signs action with wallet via Linera Web Client.
+
+Frontend sends action transaction to the game microchain contract.
+
+Contract validates move, updates GameState, emits event.
+
+Other player’s frontend (listening via MCP/GraphQL) receives event → UI updates instantly.
+
+Repeat until game end.
+
+Sequence (player vs AI)
+
+Player makes move → contract updates.
+
+AI agent subscribed to microchain event sees the move (via GraphQL / MCP).
+
+AI computes response (minimax or LLM-prompted engine) off-chain, then signs and sends move to microchain.
+
+Contract validates & updates.
+
+AI opponent design (two approaches)
+
+A. Lightweight Engine (recommended for chess):
+
+Use a small JS/TS minimax or stockfish WASM in the AI server (or on client for single-player offline).
+
+Fast and deterministic, no external requests.
+B. LLM Assistant (experimental):
+
+Use an LLM to choose moves from legal moves list (provide current FEN + allowed moves). Less accurate but fun for creative card AI.
+
+Always verify the LLM move with engine before submitting.
+
+Sample AI agent prompts (system/user) — use with GPT-style LLMs
+
+System prompt (chess engine assistant):
+
+You are a fast chess move generator. Input: current board in FEN, and list of legal moves in UCI format. Output: a single best move in UCI format and a short rationale (<=25 words). Do not output anything else.
+
+
+User prompt example:
+
+FEN: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+Legal moves: e2e4,e2e3,d2d4,...
+Return best move only.
+
+Frontend components & pages
+
+/ (Home) — create/join game UI, recent games, leaderboard
+
+/game/:id — main board view, chat, players, clock, actions
+
+Components: Board, MoveList, PlayerCard, Timer, Chat, Settings, Spectator mode, AI toggle
+
+State: React Query or SWR to manage subscriptions; use Linera Web Client subscription for live updates
+
+Repo structure (suggested)
+/flashchain
+  /contracts/                # Linera Rust smart contracts
+    game_contract/
+  /web/                      # React app (TypeScript)
+    src/
+      components/
+      pages/
+      services/              # Linera client, wallet adapters
+      ai/
+  /ai-agent/                 # Node.js AI agent (optional)
+  docker-compose.yml         # for local dev + linera testnet
+  README.md
+  CHANGELOG.md
+
+Example minimal Rust contract pseudocode (concept)
+struct GameState { ... } // as above
+
+impl Contract for Game {
+  fn handle_action(&mut self, action: Action) {
+    match action {
+      Action::MakeMove(m) => {
+        if !self.validate_turn(&m.player) { return Err("not your turn") }
+        if !self.basic_validate_move(&m) { return Err("illegal") }
+        self.apply_move(m);
+        self.last_move_at = now();
+        emit(Event::MoveApplied { ... });
+        if self.is_game_over() { emit(Event::GameEnded{...}) }
+      }
+      Action::ClaimTimeout(player) => { ... }
+      // other actions
+    }
+  }
+}
+
+
+(Translate to actual Linera contract patterns using their SDK for actions/events.)
+
+UX: optimistic updates + reconciliation
+
+On move click, show immediate local move while transaction confirms.
+
+If contract rejects, show rollback animation and message.
+
+Use small pending indicator for last move until confirmed.
+
+Security & fairness considerations
+
+Always require signed wallet actions to change on-chain state.
+
+Prevent double-spend style race conditions with explicit turn checks.
+
+For AI, throttle frequency and use a signer for the AI agent.
+
+For cards (randomness), do NOT rely on client RNG. Use commit-reveal or verifiable off-chain randomness (or use microchain participant-signed seeds) — for MVP, use server RNG but mark as centralized and list as limitation.
+
+Testing & CI
+
+Unit tests for contract logic (Rust tests) — validate move application, timeout, rematch.
+
+Frontend integration tests: simulate signed actions with test wallets.
+
+E2E: dockerized local Linera + web app for local demo.
+
+Use GitHub Actions to run cargo tests and build web app.
+
+Deployment & Demo (Buildathon checklist)
+
+Ensure project compiles and runs on Linera Testnet Conway.
+
+Public GitHub repo with README and setup instructions (how to run local + deploy).
+
+Live demo URL running against Conway via Linera Web client or dockerized template.
+
+Include notes on Linera features used (microchains, MCP/GraphQL).
+
+Team member names + contact (Discord + wallet address).
+
+Changelog for this wave (what changed since last).
+
+Short demo video (30–60s) showing real-time moves and AI match.
+
+Provide Dockerized app if running locally instead of testnet.
+
+README template (short)
+# FlashChain Games - Real Time On-chain Chess & Cards
+## Demo
+Live demo: https://yourdomain.example (Conway testnet)
+
+## Tech
+- Linera microchains (contract: /contracts/game_contract)
+- React + TypeScript frontend (/web)
+- AI agent (optional /ai-agent)
+
+## Run locally (dev)
+1. Start Linera local testnet or use Conway testnet
+2. `cd web && npm install && npm run dev`
+3. `cd contracts && cargo build`
+4. For AI: `cd ai-agent && npm install && npm run start`
+
+## Submission
+- Contract path: /contracts/game_contract
+- Live demo link: ...
+- Wallets: ...
+- Changelog: CHANGELOG.md
+
+Changelog template
+## Wave 1 - YYYY-MM-DD
+- MVP: game creation, move sending, basic validation, real-time updates
+- Known limitations: move validation partially on client
+
+Milestones & Implementation tasks (MVP plan)
+
+Week 1 (MVP):
+
+Init repo, Linera contract skeleton
+
+Simple GameState struct + apply_move action
+
+React board UI + integrate Linera Web Client with wallet signing
+
+Create /game creation flow and real-time subscription
+
+Week 2:
+
+Add move history, replay view, basic clocks
+
+Build AI agent that listens & responds (minimax/stockfish WASM)
+
+Create demo video + README
+
+Polish:
+
+Add matchmaking & leaderboard
+
+Card game variant engine
+
+Robust on-chain validation & randomness improvements
+
+Useful dev tips
+
+Use chess.js on frontend for legal moves to avoid implementing full chess rules in contract initially. Contract should do minimal safety checks to prevent cheating.
+
+Subscribe to microchain events so UI updates instantly without polling.
+
+For the AI agent, have a dedicated wallet + signer. Keep its private key secure (not in repo).
+
+Keep all heavy computation off-chain; on-chain should be state authoritative only.
+
+AI Agent Prompts — Ready to copy
+
+For chess (LLM fallback):
+
+System: You are a chess assistant. Only output a single move in UCI format (e.g., e2e4). Input includes FEN and legal moves. Choose the best move (depth ~2). Do not explain.
+User: FEN: {FEN}
+Legal: {comma-separated UCI moves}
+Return one move only.
+
+
+For cards (simple rule-based):
+
+System: You are a card game AI. Given hand and table state, choose action: play card X or pass. Keep logic simple and follow priority: 1) win immediate trick, 2) preserve trump, 3) minimize point loss. Output only the action string.
+
+Submission checklist (copy into PR)
+
+ Live demo link (runs on Conway)
+
+ Public GitHub repo with README & setup
+
+ Contract compiles + included examples
+
+ Demo video (30–60s) in README
+
+ Team members + contact info + wallets
+
+ CHANGELOG.md with wave summary
+
+If you want, I’ll now:
+
+Generate a README.md and CHANGELOG.md for your repo (copy-paste ready).
+
+Produce the Rust contract skeleton (real code scaffold) and a React app starter with Linera client integration.
+
+Create the AI agent script for a minimax chess opponent (Node.js + WASM stockfish or simple engine).
+
+Tell me which of the three I should produce first and I’ll output the exact files and code you can paste into your repo.

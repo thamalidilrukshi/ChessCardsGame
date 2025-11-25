@@ -26,11 +26,21 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
       const state = gameService.getGameState(gameId);
       if (state) {
         // Only update if FEN changed to avoid jitter
-        if (state.boardState !== chess.fen()) {
-          const newChess = new Chess(state.boardState);
-          setChess(newChess);
+        const serverMoves = state.moveHistory.length;
+        const localMoves = chess.history().length;
+
+        // Only sync if server has MORE moves (AI moved) OR it's a fresh load (both 0)
+        // If we just moved (local > server), do NOT overwrite
+        if (serverMoves > localMoves || (serverMoves === 0 && localMoves === 0)) {
+           if (state.boardState !== chess.fen()) {
+             const newChess = new Chess(state.boardState);
+             setChess(newChess);
+           }
+           setGame({ ...state });
+        } else if (serverMoves === localMoves) {
+           // Sync metadata like status/result, but be careful with board state
+           setGame({ ...state });
         }
-        setGame({ ...state });
       }
       setIsLoading(false);
     };
@@ -38,7 +48,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
     fetchState();
     const interval = setInterval(fetchState, 1000); // 1s polling for "real-time" feel
     return () => clearInterval(interval);
-  }, [gameId, chess]);
+  }, [gameId, chess]); // Keep 'chess' in deps so we re-eval logic after moves
 
   // Handle Click-to-Move (Alternative to Drag-and-Drop)
   const onSquareClick = useCallback((square: string) => {

@@ -1,36 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Chess } from 'chess.js';
-
-// Types matching the PRD concept
-export interface Player {
-  wallet: string;
-  color: 'w' | 'b';
-  seatId: number;
-  name?: string; // Mock name
-}
-
-export interface GameState {
-  gameId: string;
-  players: Player[];
-  turn: 'w' | 'b';
-  boardState: string; // FEN
-  moveHistory: string[];
-  status: 'waiting' | 'active' | 'finished';
-  result?: 'win' | 'loss' | 'draw';
-  lastMoveAt: number;
-}
-
 // Mock Data Store
 let MOCK_GAMES: Record<string, GameState> = {
   'game-demo': {
     gameId: 'game-demo',
     players: [
       { wallet: '0x789...xyz', color: 'w', seatId: 0, name: 'You' },
+      { wallet: 'AI-AGENT-001', color: 'b', seatId: 1, name: 'FlashChain AI' },
     ],
     turn: 'w',
     boardState: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
     moveHistory: [],
-    status: 'waiting',
+    status: 'active',
     lastMoveAt: Date.now(),
   }
 };
@@ -53,6 +32,8 @@ const saveGames = () => {
   }
 };
 
+import { Chess } from 'chess.js';
+
 // Simulation of Linera Microchain interactions
 export const gameService = {
   // Mock Wallet Connection
@@ -70,34 +51,28 @@ export const gameService = {
     return localStorage.getItem('flashchain_wallet');
   },
 
-  // Create a new game (mock transaction)
+  // Create a new game (mock transaction) - INSTANTLY STARTS VS AI
   createGame: async (wallet: string): Promise<string> => {
     const id = `game-${Math.floor(Math.random() * 10000)}`;
     MOCK_GAMES[id] = {
       gameId: id,
-      players: [{ wallet, color: 'w', seatId: 0, name: 'You' }],
-      turn: 'w',
+      players: [
+        { wallet, color: 'w', seatId: 0, name: 'You' },
+        { wallet: 'AI-AGENT-001', color: 'b', seatId: 1, name: 'FlashChain AI' }
+      ],
+      turn: 'w', // Player always white for MVP
       boardState: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
       moveHistory: [],
-      status: 'waiting',
+      status: 'active', // Instant start
       lastMoveAt: Date.now(),
     };
     saveGames();
-    return new Promise((resolve) => setTimeout(() => resolve(id), 800)); // Simulate network lag
+    return new Promise((resolve) => setTimeout(() => resolve(id), 800));
   },
 
-  // Join a game
+  // Join a game (Legacy/Multiplayer stub)
   joinGame: async (gameId: string, wallet: string): Promise<boolean> => {
-    const game = MOCK_GAMES[gameId];
-    if (!game || game.status !== 'waiting') return false;
-    
-    // Avoid duplicate join
-    if (game.players.some(p => p.wallet === wallet)) return true;
-
-    game.players.push({ wallet, color: 'b', seatId: 1, name: 'Opponent' });
-    game.status = 'active';
-    saveGames();
-    return new Promise((resolve) => setTimeout(() => resolve(true), 500));
+    return true; // No-op for AI mode
   },
 
   // Get Game State
@@ -116,21 +91,57 @@ export const gameService = {
       const move = chess.move({ from, to, promotion: promotion || 'q' });
       if (!move) return false;
 
-      // Update state
+      // Update state (Player Move)
       game.boardState = chess.fen();
       game.turn = chess.turn();
       game.moveHistory.push(move.san);
       game.lastMoveAt = Date.now();
+      saveGames();
 
       if (chess.isGameOver()) {
         game.status = 'finished';
-        game.result = chess.isDraw() ? 'draw' : 'win'; // Simplified
+        game.result = chess.isDraw() ? 'draw' : 'win';
+        saveGames();
+        return true;
       }
-      
-      saveGames();
-      return new Promise((resolve) => setTimeout(() => resolve(true), 300)); // Fast microchain update
+
+      // TRIGGER AI MOVE (Simulated Off-Chain Agent)
+      if (game.turn === 'b') {
+        setTimeout(() => {
+           gameService.processAIMove(gameId);
+        }, 1500); // Artificial thinking time
+      }
+
+      return true;
     } catch (e) {
       return false;
+    }
+  },
+
+  // AI Logic (Simulated Microchain "Bot" Transaction)
+  processAIMove: (gameId: string) => {
+    const game = MOCK_GAMES[gameId];
+    if (!game || game.status !== 'active') return;
+
+    const chess = new Chess(game.boardState);
+    const moves = chess.moves();
+    
+    if (moves.length > 0) {
+      // Simple AI: Random Move (MVP) -> Replace with Minimax if needed
+      const randomMove = moves[Math.floor(Math.random() * moves.length)];
+      chess.move(randomMove);
+
+      // Update State
+      game.boardState = chess.fen();
+      game.turn = chess.turn();
+      game.moveHistory.push(randomMove);
+      game.lastMoveAt = Date.now();
+      
+      if (chess.isGameOver()) {
+        game.status = 'finished';
+        game.result = chess.isDraw() ? 'draw' : 'loss';
+      }
+      saveGames();
     }
   },
 

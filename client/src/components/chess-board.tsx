@@ -127,6 +127,7 @@ export function GameBoard({ gameId, isSpectator = false }: GameBoardProps) {
 
         <div className="w-full max-w-[600px] aspect-square relative neon-glow rounded-lg overflow-hidden border-2 border-primary/30">
           <Chessboard 
+            id="BasicBoard"
             position={chess.fen()} 
             onPieceDrop={onDrop}
             customDarkSquareStyle={{ backgroundColor: '#1e293b' }} // slate-800

@@ -10,14 +10,27 @@ export default function Home() {
   const [games, setGames] = useState<GameState[]>([]);
   const [, setLocation] = useLocation();
   const [isCreating, setIsCreating] = useState(false);
+  const [wallet, setWallet] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
     gameService.listGames().then(setGames);
   }, []);
 
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    const address = await gameService.connectWallet();
+    setWallet(address);
+    setIsConnecting(false);
+  };
+
   const handleCreateGame = async () => {
+    if (!wallet) {
+      handleConnect();
+      return;
+    }
     setIsCreating(true);
-    const id = await gameService.createGame('0xMyWalletAddress');
+    const id = await gameService.createGame(wallet);
     setLocation(`/game/${id}`);
   };
 
@@ -31,8 +44,13 @@ export default function Home() {
             <Zap className="h-6 w-6 text-primary" />
             <span className="text-xl font-display font-bold tracking-wider neon-text">FLASHCHAIN</span>
           </div>
-          <Button variant="outline" className="font-mono border-primary/50 text-primary hover:bg-primary/10">
-            0x1234...5678
+          <Button 
+            variant="outline" 
+            className={`font-mono border-primary/50 ${wallet ? 'text-primary bg-primary/10' : 'text-muted-foreground'}`}
+            onClick={handleConnect}
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Connecting...' : wallet || 'Connect Wallet'}
           </Button>
         </div>
       </header>

@@ -49,6 +49,16 @@ const MOCK_GAMES: Record<string, GameState> = {
 
 // Simulation of Linera Microchain interactions
 export const gameService = {
+  // Mock Wallet Connection
+  connectWallet: async (): Promise<string> => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const mockAddress = `0x${Math.random().toString(16).slice(2, 10)}...${Math.random().toString(16).slice(2, 6)}`;
+        resolve(mockAddress);
+      }, 500);
+    });
+  },
+
   // Create a new game (mock transaction)
   createGame: async (wallet: string): Promise<string> => {
     const id = `game-${Math.floor(Math.random() * 10000)}`;
